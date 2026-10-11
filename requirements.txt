@@ -1,0 +1,43 @@
+# VaakSetu backend — pip install -r requirements.txt
+
+# Web
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Config / validation
+python-dotenv
+pydantic
+
+# Persistence (SQLite locally, Postgres/Neon when DATABASE_URL is set)
+aiosqlite
+asyncpg
+
+# Auth (verifies Neon Auth JWTs)
+PyJWT[crypto]
+
+# LLM (any OpenAI-compatible endpoint, see LLM_* in .env)
+openai
+langchain-openai
+langchain-core
+langgraph
+
+# Speech (Sarvam ASR + TTS)
+sarvamai
+langdetect
+
+# Audio
+pydub
+soundfile
+audioop-lts; python_version >= "3.13"  # audioop was removed from the stdlib in 3.13
+
+# Telephony
+twilio
+
+# Tests (dev only)
+pytest
+httpx
+
+# Optional offline ASR fallback (IndicWhisper, ~1.5 GB download). Uncomment to enable.
+# torch
+# transformers

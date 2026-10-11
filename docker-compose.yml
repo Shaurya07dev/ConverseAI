@@ -1,0 +1,16 @@
+services:
+
+  # ngrok tunnel — exposes your local backend to the internet
+  # so Twilio can reach your webhooks and WebSocket endpoints.
+  # Set NGROK_AUTHTOKEN in your .env file.
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: vaaksetu_ngrok
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    command: http host.docker.internal:8000
+    ports:
+      - "4040:4040"    # ngrok inspection UI
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

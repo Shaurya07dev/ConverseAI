@@ -1,0 +1,11 @@
+.git
+.env
+.env.*
+venv
+frontend
+mobile
+tools
+tests
+*.db
+**/__pycache__
+.claude

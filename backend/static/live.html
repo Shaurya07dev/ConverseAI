@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VaakSetu — Live Call Summarisation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Premium Frontend Tokens */
+            --color-ink-950: #0a0a0a;
+            --color-ink-900: #121212;
+            --color-ink-800: #1a1a1a;
+            --color-ink-700: #262626;
+
+            --color-cream-100: #f5f5f4;
+            --color-saffron: #f97316;
+            --color-amber-glow: #fbbf24;
+            --color-emerald-deep: #059669;
+            --color-err: #ef4444;
+
+            --font-display: 'DM Serif Display', serif;
+            --font-body: 'Instrument Sans', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+
+            /* Mapping */
+            --bg: var(--color-ink-950);
+            --bg2: var(--color-ink-800);
+            --card: var(--color-ink-900);
+            --accent: var(--color-saffron);
+            --glow: rgba(249,115,22,0.3);
+            --a2: var(--color-amber-glow);
+            --border: var(--color-ink-700);
+            --ba: rgba(249,115,22,0.15);
+            
+            --txt: var(--color-cream-100);
+            --txt2: #d6d3d1;
+            --mute: #78716c;
+            
+            --ok: var(--color-emerald-deep);
+            --ok-g: rgba(5,150,105,0.3);
+            --err: var(--color-err);
+            --err-g: rgba(239,68,68,0.3);
+            --warn: var(--color-amber-glow);
+
+            --r: 24px; --rs: 12px;
+        }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:var(--font-body);background:var(--bg);color:var(--txt);min-height:100vh;letter-spacing:-0.03em;}
+        body::before{content:'';position:fixed;inset:0;
+            background:radial-gradient(ellipse at 20% 0%,rgba(249,115,22,.08),transparent 50%),
+                        radial-gradient(ellipse at 80% 100%,rgba(251,191,36,.06),transparent 50%);
+            pointer-events:none;z-index:0}
+        body::after {
+            content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+            opacity:0.04;
+        }
+        
+        .wrap{max-width:1400px;margin:0 auto;padding:24px;position:relative;z-index:1}
+        h1, h2, h3 {font-family:var(--font-display); font-weight:normal; line-height:1.1;}
+
+        /* glass-card logic */
+        .glass{
+            background:color-mix(in srgb, var(--card) 60%, transparent);
+            backdrop-filter:blur(20px);
+            border:1px solid var(--border);
+        }
+
+        /* ── Header ── */
+        .hdr{display:flex;align-items:center;justify-content:space-between;
+            margin-bottom:24px;padding:18px 26px;border-radius:var(--r);
+            background:color-mix(in srgb, var(--card) 60%, transparent);backdrop-filter:blur(20px);border:1px solid var(--border);}
+        .hdr-l{display:flex;align-items:center;gap:16px}
+        .logo{width:48px;height:48px;background:linear-gradient(135deg,var(--accent),var(--a2));
+            border-radius:14px;display:flex;align-items:center;justify-content:center;
+            font-size:22px;box-shadow:0 0 30px -5px var(--glow); color: #000;}
+        .hdr h1{font-size:26px;
+            background:linear-gradient(135deg,var(--txt) 0%, var(--mute) 100%);
+            -webkit-background-clip:text;-webkit-text-fill-color:transparent}
+        .hdr p{font-size:13px;color:var(--mute);margin-top:2px;font-family:var(--font-body)}
+        
+        .pill{padding:8px 16px;border-radius:100px;font-size:13px;font-weight:600;
+            display:flex;align-items:center;gap:8px;
+            border:1px solid var(--border);background:var(--bg2)}
+        .dot{width:10px;height:10px;border-radius:50%;background:var(--mute);transition:all .3s}
+        .dot.rec{background:var(--err);box-shadow:0 0 10px var(--err-g);animation:pulse 1.4s infinite}
+        .dot.proc{background:var(--warn);box-shadow:0 0 10px rgba(251,191,36,.4);animation:pulse 1s infinite}
+        .dot.done{background:var(--ok);box-shadow:0 0 10px var(--ok-g)}
+        @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.35)}}
+
+        /* ── Controls ── */
+        .controls{display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap}
+        select{padding:12px 20px;background:var(--card);border:1px solid var(--border);
+            border-radius:var(--rs);color:var(--txt);font-family:var(--font-body);
+            font-size:14px;font-weight:500;cursor:pointer;outline:none;min-width:185px;
+            transition:border-color .2s; appearance:none;}
+        select:focus{border-color:var(--accent)}
+        select option{background:var(--bg2)}
+        
+        .btn{padding:12px 26px;border:none;border-radius:100px;
+            font-family:var(--font-body);font-size:14px;font-weight:600;
+            cursor:pointer;display:flex;align-items:center;gap:9px;
+            transition:all .3s ease;}
+        .btn-go{
+            background:var(--accent); color:#000;
+            box-shadow:0 0 30px -5px rgba(249,115,22,0.4);
+        }
+        .btn-go:hover:not(:disabled){transform:scale(1.03);box-shadow:0 0 40px rgba(249,115,22,0.6);}
+        .btn-stop{background:linear-gradient(135deg,var(--err),#dc2626);color:#fff;
+            box-shadow:0 4px 18px var(--err-g)}
+        .btn-stop:hover:not(:disabled){transform:scale(1.03);box-shadow:0 8px 26px var(--err-g)}
+        .btn:disabled{opacity:.35;cursor:not-allowed;transform:none;box-shadow:none;}
+        
+        .timer{padding:12px 20px;border-radius:100px;background:var(--bg2);
+            border:1px solid var(--border);font-size:14px;font-weight:600;color:var(--mute);
+            font-family:var(--font-mono);transition:color .3s}
+        .timer.active{color:var(--err)}
+
+        /* ── Lang + chunk info ── */
+        .info-row{display:flex;gap:10px;align-items:center;margin-bottom:24px;flex-wrap:wrap}
+        .info-tag{padding:6px 14px;border-radius:100px;font-size:12px;font-weight:600;
+            border:1px solid var(--border);background:var(--bg2);color:var(--txt2)}
+
+        /* ── Viz ── */
+        .viz-wrap{margin-bottom:24px;padding:16px 20px;border-radius:var(--r);display:none;
+            background:color-mix(in srgb, var(--card) 60%, transparent);backdrop-filter:blur(20px);border:1px solid var(--border);}
+        .viz-wrap.on{display:block}
+        #viz{width:100%;height:60px;border-radius:8px}
+
+        /* ── Chunk progress ── */
+        .chunk-progress{display:none;align-items:center;gap:10px;padding:12px 18px;
+            background:rgba(249,115,22,.08);border:1px dashed rgba(249,115,22,.3);
+            border-radius:var(--rs);margin-bottom:24px;font-size:13px;color:var(--accent)}
+        .chunk-progress.on{display:flex}
+        .mic-dot{width:10px;height:10px;border-radius:50%;background:var(--accent);
+            animation:pulse .9s infinite;flex-shrink:0}
+
+        /* ── Grid ── */
+        .grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+        @media(max-width:860px){.grid{grid-template-columns:1fr}}
+        .panel{background:color-mix(in srgb, var(--card) 60%, transparent);backdrop-filter:blur(20px);border:1px solid var(--border);
+            border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column}
+        .ph{padding:18px 24px;border-bottom:1px solid var(--border);
+            display:flex;align-items:center;justify-content:space-between}
+        .ph h2{font-size:22px;display:flex;align-items:center;gap:10px}
+        .badge{padding:4px 12px;border-radius:100px;font-size:11px;font-weight:600;
+            background:var(--bg2);color:var(--mute);border:1px solid var(--border)}
+        .pb{padding:20px 24px;flex:1;min-height:280px;max-height:460px;overflow-y:auto}
+        .pb::-webkit-scrollbar{width:6px}
+        .pb::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+        .full{grid-column:1/-1}
+
+        /* Entries */
+        .entry{padding:14px 18px;margin-bottom:12px;background:var(--bg2);
+            border-radius:var(--rs);border-left:3px solid var(--accent);
+            font-size:15px;line-height:1.6;animation:fadeUp .3s ease-out}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+        .lbl{font-size:11px;color:var(--mute);font-weight:700;font-family:var(--font-mono);
+            letter-spacing:1px;margin-bottom:6px}
+        .narr{font-size:15px;line-height:1.8;color:var(--txt);white-space:pre-wrap}
+        .narr:empty::after{content:'AI summary constructs dynamically here...';
+            color:var(--mute);font-style:italic}
+            
+        .field-card{padding:14px 18px;margin-bottom:10px;background:var(--bg2);
+            border-radius:var(--rs);border:1px solid var(--border);animation:fadeUp .3s ease-out}
+        .fk{font-size:11px;color:var(--mute);font-weight:700;font-family:var(--font-mono);
+            letter-spacing:1px;margin-bottom:6px}
+        .fv{font-size:15px;color:var(--txt)}
+        
+        .empty{display:flex;flex-direction:column;align-items:center;
+            justify-content:center;height:180px;color:var(--mute);
+            font-size:15px;text-align:center;gap:12px}
+        .empty .ico{font-size:42px;opacity:.4}
+        
+        .proc-badge{display:none;padding:10px 16px;
+            background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3);
+            border-radius:var(--rs);color:var(--a2);font-size:14px;font-weight:500;
+            margin-bottom:16px;align-items:center;gap:10px}
+        .proc-badge.on{display:flex}
+
+        /* Speaker tags */
+        .stags{display:flex;gap:8px;flex-wrap:wrap}
+        .stag{padding:4px 12px;border-radius:100px;background:var(--bg2);
+            border:1px solid var(--border);font-size:12px;font-weight:500;color:var(--txt2)}
+
+        /* Toast */
+        .toast{position:fixed;bottom:24px;right:24px;padding:14px 24px;
+            background:var(--bg2);border:1px solid var(--accent);border-radius:var(--rs);
+            color:var(--txt);font-size:15px;font-weight:500;
+            box-shadow:0 8px 30px rgba(0,0,0,.6);z-index:9999;
+            opacity:0;pointer-events:none;transform:translateY(20px);transition:all .4s cubic-bezier(0.16, 1, 0.3, 1)}
+        .toast.on{opacity:1;pointer-events:auto;transform:none}
+    </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <div class="hdr">
+    <div class="hdr-l">
+      <div class="logo">V</div>
+      <div>
+        <h1>VaakSetu — Live Call Summarisation</h1>
+        <p>Multilingual real-time transcription via Sarvam ASR + AI summary</p>
+      </div>
+    </div>
+    <div class="pill"><span class="dot" id="dot"></span><span id="stxt">Ready</span></div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <select id="domain">
+      <option value="healthcare">🏥 Healthcare</option>
+      <option value="finance">💰 Finance</option>
+    </select>
+
+    <select id="langSel">
+      <option value="hi-IN">🇮🇳 Hindi</option>
+      <option value="en-IN">🇮🇳 English (India)</option>
+      <option value="bn-IN">Bengali</option>
+      <option value="ta-IN">Tamil</option>
+      <option value="te-IN">Telugu</option>
+      <option value="kn-IN">Kannada</option>
+      <option value="ml-IN">Malayalam</option>
+      <option value="mr-IN">Marathi</option>
+      <option value="gu-IN">Gujarati</option>
+      <option value="pa-IN">Punjabi</option>
+      <option value="od-IN">Odia</option>
+    </select>
+
+    <button class="btn btn-go" id="btnStart" onclick="startSession()">🎤 Start Conversation</button>
+    <button class="btn btn-stop" id="btnStop" onclick="stopSession()" disabled>⏹️ Stop &amp; Summarise</button>
+    <button class="btn btn-go" id="btnPdf" onclick="downloadPdf()" disabled>📄 Download PDF</button>
+    <div class="timer" id="tmr">00:00</div>
+  </div>
+
+  <!-- Info row -->
+  <div class="info-row" id="infoRow"></div>
+
+  <!-- Chunk progress indicator -->
+  <div class="chunk-progress" id="chunkProg">
+    <span class="mic-dot"></span>
+    <span id="chunkMsg">Recording chunk... will transcribe in <span id="cdSec">5</span>s</span>
+  </div>
+
+  <!-- Visualizer -->
+  <div class="viz-wrap" id="vizWrap"><canvas id="viz"></canvas></div>
+
+  <!-- Grid -->
+  <div class="grid">
+
+    <!-- Transcript -->
+    <div class="panel">
+      <div class="ph">
+        <h2>📝 Live Transcript <span style="font-size:11px;color:var(--mute);font-weight:400">(Sarvam ASR)</span></h2>
+        <span class="badge" id="cntBadge">0 chunks</span>
+      </div>
+      <div class="pb" id="txBody">
+        <div class="empty" id="txEmpty"><span class="ico">🎙️</span><span>Start speaking to see transcript</span></div>
+      </div>
+    </div>
+
+    <!-- Narrative -->
+    <div class="panel">
+      <div class="ph">
+        <h2>📖 AI Narrative</h2>
+        <span class="badge">LangGraph</span>
+      </div>
+      <div class="pb">
+        <div class="proc-badge" id="procBadge">⏳ Generating comprehensive summary...</div>
+        <div class="narr" id="narr"></div>
+      </div>
+    </div>
+
+    <!-- Structured Data – full width -->
+    <div class="panel full">
+      <div class="ph">
+        <h2>📊 Extracted Fields</h2>
+        <div class="stags" id="stags"></div>
+      </div>
+      <div class="pb" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;max-height:280px" id="fieldsGrid">
+        <div class="empty" id="fieldsEmpty" style="grid-column:1/-1">
+          <span class="ico">📋</span><span>Fields extracted at end of conversation</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════
+// Config
+// ═══════════════════════════════════════════════════
+const CHUNK_INTERVAL_MS = 7000;  // Record 7-second chunks for Sarvam ASR
+// Opened from the dashboard as /live#token=<jwt> (the fragment never reaches server logs).
+// shortcut: the token expires after 15 min, so server ASR stops on longer captures; reopen from the dashboard.
+const TOKEN = new URLSearchParams(location.hash.slice(1)).get('token') || '';
+const WS_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/live/stream?token=${encodeURIComponent(TOKEN)}`;
+
+// ═══════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════
+let ws = null, mediaRecorder = null, mediaStream = null;
+let audioCtx = null, analyser = null, vizRaf = null;
+let timerIv = null, chunkIv = null, cdIv = null;
+let startTime = null, chunkCount = 0, cdSec = 0;
+let finalSummary = null;
+let currentSessionId = null;
+
+// ═══════════════════════════════════════════════════
+// Utilities
+// ═══════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function toast(msg, ms=3500){
+  const el=$('toast'); el.textContent=msg; el.classList.add('on');
+  setTimeout(()=>el.classList.remove('on'),ms);
+}
+
+function setStatus(txt, state=''){
+  $('stxt').textContent=txt;
+  $('dot').className='dot '+(state||'');
+  $('tmr').className='timer'+(state==='rec'?' active':'');
+}
+
+function tick(){
+  const s=Math.floor((Date.now()-startTime)/1000);
+  $('tmr').textContent=`${pad(Math.floor(s/60))}:${pad(s%60)}`;
+}
+function pad(n){return String(n).padStart(2,'0')}
+
+// ═══════════════════════════════════════════════════
+// Visualizer
+// ═══════════════════════════════════════════════════
+function startViz(stream){
+  const wrap=$('vizWrap'); wrap.classList.add('on');
+  const cv=$('viz'),ctx2=cv.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  cv.width=cv.offsetWidth*dpr; cv.height=cv.offsetHeight*dpr;
+  audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  analyser=audioCtx.createAnalyser(); analyser.fftSize=256;
+  audioCtx.createMediaStreamSource(stream).connect(analyser);
+  const buf=new Uint8Array(analyser.frequencyBinCount);
+  function draw(){
+    vizRaf=requestAnimationFrame(draw);
+    analyser.getByteFrequencyData(buf);
+    ctx2.fillStyle='#1a2235'; ctx2.fillRect(0,0,cv.width,cv.height);
+    const bw=(cv.width/buf.length)*1.9; let x=0;
+    buf.forEach(v=>{
+      const h=(v/255)*cv.height*.88;
+      const g=ctx2.createLinearGradient(0,cv.height,0,cv.height-h);
+      g.addColorStop(0,'#6366f1'); g.addColorStop(1,'#a78bfa');
+      ctx2.fillStyle=g; ctx2.fillRect(x,cv.height-h,bw-1,h); x+=bw;
+    });
+  }
+  draw();
+}
+
+function stopViz(){
+  if(vizRaf)cancelAnimationFrame(vizRaf);
+  if(audioCtx)audioCtx.close().catch(()=>{});
+  $('vizWrap').classList.remove('on');
+}
+
+// ═══════════════════════════════════════════════════
+// Sarvam ASR via server
+// ═══════════════════════════════════════════════════
+async function transcribeBlob(blob, langCode){
+  const fd = new FormData();
+  // Rename to .webm so backend knows format
+  fd.append('audio', blob, 'chunk.webm');
+  try {
+    const r = await fetch('/api/transcribe', { method:'POST', body:fd, headers: TOKEN ? {Authorization:'Bearer '+TOKEN} : {} });
+    if(!r.ok){
+      const err=await r.json().catch(()=>({}));
+      console.warn('ASR error:', err.detail || r.statusText);
+      return null;
+    }
+    const data = await r.json();
+    return data.transcript || null;
+  } catch(e){
+    console.error('ASR fetch failed:', e);
+    return null;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// WebSocket
+// ═══════════════════════════════════════════════════
+function connectWS(domain){
+  ws = new WebSocket(WS_URL);
+  ws.onopen = () => ws.send(JSON.stringify({type:'start',domain}));
+  ws.onmessage = e => handleMsg(JSON.parse(e.data));
+  ws.onerror = () => toast('⚠️ WebSocket error');
+}
+
+function handleMsg(msg){
+  if(msg.type==='session_started'){
+    currentSessionId = msg.session_id;
+    toast(`✅ Session ${msg.session_id} — speak now!`);
+  } else if(msg.type==='transcript_ack'){
+    addChunk(msg.text, msg.chunk_index);
+  } else if(msg.type==='agent_update'){
+    if(msg.narrative) $('narr').textContent=msg.narrative;
+    if(msg.speaker_map) renderSpeakers(msg.speaker_map);
+  } else if(msg.type==='processing'){
+    $('procBadge').classList.add('on');
+    setStatus('Generating summary...','proc');
+    $('narr').textContent='';
+  } else if(msg.type==='summary_complete'){
+    $('procBadge').classList.remove('on');
+    setStatus('Summary ready ✓','done');
+    if(msg.narrative) $('narr').textContent=msg.narrative;
+    if(msg.structured_data) renderFields(msg.structured_data);
+    if(msg.speaker_map) renderSpeakers(msg.speaker_map);
+    finalSummary = msg;
+    $('btnPdf').disabled = false;
+    toast('🎯 Summary complete! Scroll down for extracted fields.',4500);
+  } else if(msg.type==='error'){
+    toast('❌ '+msg.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// UI helpers
+// ═══════════════════════════════════════════════════
+function addChunk(text, idx){
+  $('txEmpty')?.remove();
+  const b=$('txBody');
+  const d=document.createElement('div');
+  d.className='entry';
+  d.innerHTML=`<div class="lbl">Segment ${(idx??chunkCount)+1}</div><div>${esc(text)}</div>`;
+  b.appendChild(d); b.scrollTop=b.scrollHeight;
+  chunkCount++;
+  $('cntBadge').textContent=`${chunkCount} chunk${chunkCount===1?'':'s'}`;
+}
+
+function renderFields(data){
+  const g=$('fieldsGrid');
+  if(!data||!Object.keys(data).length) return;
+  $('fieldsEmpty')?.remove();
+  for(const[k,v] of Object.entries(data)){
+    const dv=Array.isArray(v)?v.join(', '):String(v);
+    if(!dv||dv==='null'||dv==='None') continue;
+    const c=document.createElement('div'); c.className='field-card';
+    c.innerHTML=`<div class="fk">${k.replace(/_/g,' ')}</div><div class="fv">${esc(dv)}</div>`;
+    g.appendChild(c);
+  }
+}
+
+function renderSpeakers(map){
+  const c=$('stags'); c.innerHTML='';
+  for(const[s,r] of Object.entries(map)){
+    const t=document.createElement('span'); t.className='stag';
+    t.textContent=`${s} → ${r}`; c.appendChild(t);
+  }
+}
+
+function showInfo(lang, domain){
+  const r=$('infoRow'); r.innerHTML='';
+  [{label:`🌐 Language: ${lang}`},{label:`🏷️ Domain: ${domain}`},
+   {label:'🔬 ASR: Sarvam saaras:v3'},{label:'🧠 LangGraph Agent'}]
+  .forEach(({label})=>{
+    const t=document.createElement('span'); t.className='info-tag'; t.textContent=label;
+    r.appendChild(t);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// Countdown for chunk timer
+// ═══════════════════════════════════════════════════
+function startCountdown(){
+  cdSec=Math.floor(CHUNK_INTERVAL_MS/1000);
+  function tick2(){$('cdSec').textContent=cdSec; if(cdSec>0)cdSec--;}
+  tick2();
+  cdIv=setInterval(tick2,1000);
+}
+function resetCountdown(){
+  clearInterval(cdIv); startCountdown();
+}
+
+// ═══════════════════════════════════════════════════
+// MediaRecorder chunk dispatch
+// ═══════════════════════════════════════════════════
+async function onChunk(blob, langCode){
+  if(blob.size < 1000){ return; }  // skip near-silence
+  $('chunkMsg').innerHTML=`Transcribing with Sarvam ASR... <span id="cdSec">${Math.floor(CHUNK_INTERVAL_MS/1000)}</span>s`;
+
+  const text = await transcribeBlob(blob, langCode);
+
+  if(text && text.trim()){
+    // Send to WS → LangGraph
+    if(ws && ws.readyState===WebSocket.OPEN){
+      ws.send(JSON.stringify({type:'transcript_text', text: text.trim()}));
+    }
+    $('chunkMsg').innerHTML=`Next chunk in <span id="cdSec">${Math.floor(CHUNK_INTERVAL_MS/1000)}</span>s`;
+    resetCountdown();
+  } else {
+    $('chunkMsg').innerHTML=`No speech detected. Next chunk in <span id="cdSec">${Math.floor(CHUNK_INTERVAL_MS/1000)}</span>s`;
+    toast('🔇 No speech detected in last chunk');
+    resetCountdown();
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// Session control
+// ═══════════════════════════════════════════════════
+async function startSession(){
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({audio:true});
+  } catch(e){
+    toast('❌ Microphone access denied. Allow mic in browser settings.'); return;
+  }
+
+  const domain=$('domain').value;
+  const lang=$('langSel').value;
+
+  connectWS(domain);
+  startViz(mediaStream);
+  showInfo(lang, domain);
+
+  // --- MediaRecorder: record fixed-length chunks for Sarvam ASR ---
+  const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+    ? 'audio/webm;codecs=opus' : 'audio/webm';
+
+  mediaRecorder = new MediaRecorder(mediaStream, {mimeType});
+
+  let chunks = [];
+  mediaRecorder.ondataavailable = e => { if(e.data.size>0) chunks.push(e.data); };
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(chunks, {type:mimeType}); chunks=[];
+    onChunk(blob, lang);
+  };
+
+  // Start recording; stop every CHUNK_INTERVAL_MS to get a chunk
+  mediaRecorder.start();
+  chunkIv = setInterval(()=>{
+    if(mediaRecorder && mediaRecorder.state==='recording'){
+      mediaRecorder.stop();     // triggers onstop → ASR
+      mediaRecorder.start();    // immediately start next chunk
+    }
+  }, CHUNK_INTERVAL_MS);
+
+  // UI
+  $('btnStart').disabled=true; $('btnStop').disabled=false;
+  $('domain').disabled=true; $('langSel').disabled=true;
+  $('chunkProg').classList.add('on');
+  setStatus('Recording...','rec');
+  startTime=Date.now();
+  timerIv=setInterval(tick,1000);
+  startCountdown();
+  chunkCount=0;
+
+  toast('🎙️ Recording started — speak clearly in your chosen language!');
+}
+
+function stopSession(){
+  // Stop chunk timer
+  clearInterval(chunkIv);
+  clearInterval(cdIv);
+
+  // Stop recorder, collect final chunk
+  if(mediaRecorder && mediaRecorder.state!=='inactive'){
+    mediaRecorder.onstop = async () => {
+      // Transcribe final chunk first
+      const blob = new Blob(mediaRecorder._finalChunks||[], {type:'audio/webm'});
+      if(blob.size > 1000){
+        const text = await transcribeBlob(blob, $('langSel').value);
+        if(text && text.trim() && ws && ws.readyState===WebSocket.OPEN){
+          ws.send(JSON.stringify({type:'transcript_text', text:text.trim()}));
+        }
+      }
+      // Then signal stop — server generates full summary
+      setTimeout(()=>{
+        if(ws && ws.readyState===WebSocket.OPEN){
+          ws.send(JSON.stringify({type:'stop'}));
+        }
+      }, 500);
+    };
+    mediaRecorder._finalChunks=[];
+    const origOnData = mediaRecorder.ondataavailable;
+    mediaRecorder.ondataavailable = e=>{
+      origOnData(e);
+      mediaRecorder._finalChunks.push(e.data);
+    };
+    mediaRecorder.stop();
+  } else {
+    // No recorder active, just send stop
+    if(ws && ws.readyState===WebSocket.OPEN){
+      ws.send(JSON.stringify({type:'stop'}));
+    }
+  }
+
+  stopViz();
+  if(mediaStream) { mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
+  clearInterval(timerIv);
+
+  $('chunkProg').classList.remove('on');
+  $('btnStart').disabled=false; $('btnStop').disabled=true;
+  // Enable again only when summary is ready
+  $('btnPdf').disabled = true;
+  $('domain').disabled=false; $('langSel').disabled=false;
+
+  toast('⏹️ Stopped. Generating final summary...');
+}
+
+function downloadPdf(){
+  if(!finalSummary){
+    toast('⚠️ Summary not ready yet.');
+    return;
+  }
+  const jspdfRef = window.jspdf;
+  if(!jspdfRef || !jspdfRef.jsPDF){
+    toast('❌ PDF library not loaded.');
+    return;
+  }
+
+  const { jsPDF } = jspdfRef;
+  const doc = new jsPDF({unit:'pt', format:'a4'});
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 48;
+  const contentWidth = pageWidth - margin * 2;
+  let y = margin;
+
+  const ensureSpace = (need=24) => {
+    if(y + need > pageHeight - margin){
+      doc.addPage();
+      y = margin;
+    }
+  };
+  const addTitle = (text) => {
+    ensureSpace(36);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(20);
+    doc.text(text, margin, y);
+    y += 26;
+  };
+  const addSection = (text) => {
+    ensureSpace(28);
+    doc.setFont('helvetica','bold');
+    doc.setFontSize(13);
+    doc.text(text, margin, y);
+    y += 16;
+  };
+  const addLine = (text, size=10) => {
+    doc.setFont('helvetica','normal');
+    doc.setFontSize(size);
+    const lines = doc.splitTextToSize(String(text), contentWidth);
+    ensureSpace(lines.length * (size + 4) + 6);
+    doc.text(lines, margin, y);
+    y += lines.length * (size + 4) + 4;
+  };
+
+  addTitle('VaakSetu Live Interaction Report');
+  addLine(`Generated: ${new Date().toISOString()}`);
+  addLine(`Session ID: ${currentSessionId || 'N/A'}`);
+  addLine(`Domain: ${$('domain').value}`);
+  addLine(`Language: ${$('langSel').value}`);
+  addLine(`Captured Chunks: ${finalSummary.transcript?.length || 0}`);
+
+  addSection('Narrative Summary');
+  addLine(finalSummary.narrative || 'No narrative generated.');
+
+  addSection('Extracted Structured Fields');
+  const fields = finalSummary.structured_data || {};
+  const entries = Object.entries(fields);
+  if(entries.length === 0){
+    addLine('No structured fields extracted.');
+  } else {
+    entries.forEach(([k,v]) => addLine(`- ${k}: ${Array.isArray(v) ? v.join(', ') : String(v)}`));
+  }
+
+  addSection('Speaker Mapping');
+  const speakers = finalSummary.speaker_map || {};
+  const spEntries = Object.entries(speakers);
+  if(spEntries.length === 0){
+    addLine('No speaker mapping available.');
+  } else {
+    spEntries.forEach(([k,v]) => addLine(`- ${k}: ${v}`));
+  }
+
+  addSection('Transcript');
+  if(!finalSummary.transcript || finalSummary.transcript.length === 0){
+    addLine('No transcript captured.');
+  } else {
+    finalSummary.transcript.forEach((chunk, idx) => {
+      addLine(`[Chunk ${idx+1}] ${chunk}`);
+    });
+  }
+
+  const safeSession = (currentSessionId || 'live').replace(/[^a-zA-Z0-9-_]/g,'_');
+  doc.save(`vaaksetu_live_summary_${safeSession}.pdf`);
+}
+</script>
+</body>
+</html>
